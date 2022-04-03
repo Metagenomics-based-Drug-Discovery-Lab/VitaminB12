@@ -1,0 +1,166 @@
+---
+title: "Explorary Data Analysis for Vitamine B12 data"
+author: Batool Almarzouq
+Date: 3-4-2022
+output:
+  prettydoc::html_pretty:
+    theme: tactile
+    highlight: github
+    math: katex
+---
+## Summary
+
+The Final_Daatset contains 5009 patients of which 1798 of them are control and 3211 are prescribed metformin. All metformin-treated patients are in the Medication dataset. Both datasets were combined in the joined_dataset. The earlier clinic date is 2018-01-01 and the latest is 2019-11-21. The oldest patient is born on 1921-03-11 and the younger patient is born on 2004-02-15. The latest exam was carried out on 2022-02-14 16:06:34. Also, the patients come from 15 hospitals which are KAMC-R, NGCSC, HCSC, DIRAB, PBRC, ISKAN, FMPHC-M, Bahra, KAMC-J, NGSPC, Iskan, KAH, IABFH, PHC-HS, DmPHC.
+
+
+## Install Packages
+
+```{r message=FALSE, warning=FALSE}
+library(readxl)
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+library(anytime)
+library(DataExplorer)
+library(skimr)
+
+```
+
+## Read the data from excel
+
+```{r message=FALSE, warning=FALSE}
+#read the complete dataset
+Final_Dataset <- read_csv(here("data","Final_Dataset.csv")) %>% 
+  janitor::clean_names() %>% 
+  mutate(age = gsub("year","", age)) 
+
+# Make the age and exam results numeric  
+Final_Dataset$age <-as.numeric(Final_Dataset$age)
+Final_Dataset$exam_result <-as.numeric(Final_Dataset$exam_result)
+Final_Dataset$patient_no <- as.character(Final_Dataset$patient_no)
+
+#read the medications dataset
+medications <- read_csv(here("data","medications.csv")) %>% 
+  janitor::clean_names()
+
+medications$patient_no <- as.character(medications$patient_no)
+
+```
+
+## Explore the Final Dataset
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+# Have a look at the dimentions
+dim(Final_Dataset)
+# Have a look at all columns in the dataset
+glimpse(Final_Dataset)
+# Summarise each column
+#summary(Final_Dataset)
+# Summarise each column in a table
+skim(Final_Dataset)
+
+
+```
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# generate a report from the dataset
+DataExplorer::create_report(Final_Dataset)
+```
+
+## Explore the age of the sample and number of control or treatment
+
+```{r}
+summary(Final_Dataset$age)
+summary(Final_Dataset$exam_result)
+
+# Final_Dataset_control <- Final_Dataset %>% 
+#   group_by(patient_no) %>% 
+#   summarise(metformin_patients = sum(metformin_use == 0))
+
+Final_Dataset_control <- Final_Dataset %>% 
+  filter(metformin_use == 0) %>% 
+  group_by(patient_no) %>% 
+  summarise(n())
+
+paste0("nember of patients who are control: ", nrow(Final_Dataset_control))
+
+Final_Dataset_metforin <- Final_Dataset %>% 
+  filter(metformin_use == 1) %>% 
+  group_by(patient_no) %>% 
+  summarise(n())
+
+paste0("nember of patients who took metformin: ", nrow(Final_Dataset_metforin))
+```
+
+
+## Explore the Medication Dataset
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Have a look at all columns in the dataset
+glimpse(medications)
+# Have a look at the dimentions
+dim(medications)
+# Summarise each column
+#summary(medications)
+# Summarise each column in a table
+skim(medications)
+
+```
+
+
+## Explore the hospitals and Medicine names
+
+```{r}
+# Hospital names:
+unique(medications$hospital_name)
+unique(medications$medicine_name_general)
+
+```
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# generate a report from the dataset
+DataExplorer::create_report(Final_Dataset)
+```
+
+## Explore the Patients in each dataset
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# number of patients in the complete/final dataset
+paste0("The number of patients in the complete/final dataset are ", length(unique(Final_Dataset$patient_no)))
+
+#number of patients in the medications dataset
+paste0("The number of patients in the medications dataset are ", length(unique(medications$patient_no)))
+```
+
+```{r}
+patient_no_dataset <- unique(Final_Dataset$patient_no)
+length(patient_no_dataset)
+
+patient_no_medications <- unique(medications$patient_no)
+length(patient_no_medications)
+
+length(which(patient_no_dataset %in% patient_no_medications))
+
+```
+
+## Join both datasets
+
+```{r}
+
+joined_data <- dplyr::right_join(Final_Dataset, medications, by =c("patient_no", "clinic_date"))
+dim(joined_data)
+
+length(unique(joined_data$patient_no))
+
+joined_data <- joined_data%>% 
+  select(-ends_with(".y")) %>% 
+  janitor::clean_names()
+
+write_csv(joined_data, here("data", "joined.csv"))
+
+```
+
+
+
