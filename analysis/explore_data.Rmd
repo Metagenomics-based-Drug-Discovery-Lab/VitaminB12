@@ -4,13 +4,13 @@ author: Batool Almarzouq
 Date: 3-4-2022
 output:
   prettydoc::html_pretty:
-    theme: tactile
+    theme: leonids
     highlight: github
     math: katex
 ---
 ## Summary
 
-The Final_Daatset contains 5009 patients of which 1798 of them are control and 3211 are prescribed metformin. All metformin-treated patients are in the Medication dataset. Both datasets were combined in the joined_dataset. The earlier clinic date is 2018-01-01 and the latest is 2019-11-21. The oldest patient is born on 1921-03-11 and the younger patient is born on 2004-02-15. The latest exam was carried out on 2022-02-14 16:06:34. Also, the patients come from 15 hospitals which are KAMC-R, NGCSC, HCSC, DIRAB, PBRC, ISKAN, FMPHC-M, Bahra, KAMC-J, NGSPC, Iskan, KAH, IABFH, PHC-HS, DmPHC.
+The Final_Dataset contains 5009 patients of which 1798 of them are control and 3211 are prescribed metformin. All metformin-treated patients are in the Medication dataset. Both datasets were combined in the joined_dataset. The earlier clinic date is 2018-01-01 and the latest is 2019-11-21. The oldest patient is born on 1921-03-11 and the younger patient is born on 2004-02-15. The latest exam was carried out on 2022-02-14 16:06:34. Also, the patients come from 15 hospitals which are KAMC-R, NGCSC, HCSC, DIRAB, PBRC, ISKAN, FMPHC-M, Bahra, KAMC-J, NGSPC, Iskan, KAH, IABFH, PHC-HS, DmPHC.
 
 
 ## Install Packages
