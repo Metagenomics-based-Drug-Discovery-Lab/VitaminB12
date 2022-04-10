@@ -4,9 +4,8 @@ author: Batool Almarzouq
 Date: 3-4-2022
 output:
   prettydoc::html_pretty:
-    theme: leonids
+    theme: cayman
     highlight: github
-    math: katex
 ---
 ## Summary
 
@@ -46,9 +45,16 @@ medications <- read_csv(here("data","medications.csv")) %>%
 
 medications$patient_no <- as.character(medications$patient_no)
 
+
+
 ```
 
 ## Explore the Final Dataset
+
+```{r}
+
+```
+
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
 
@@ -84,14 +90,33 @@ Final_Dataset_control <- Final_Dataset %>%
   group_by(patient_no) %>% 
   summarise(n())
 
+
 paste0("nember of patients who are control: ", nrow(Final_Dataset_control))
+
+Final_Dataset_control  <-  Final_Dataset %>% 
+  filter(metformin_use == 0) 
+
+summary(Final_Dataset_control)
 
 Final_Dataset_metforin <- Final_Dataset %>% 
   filter(metformin_use == 1) %>% 
   group_by(patient_no) %>% 
   summarise(n())
 
+
+hist(Final_Dataset_control$age, breaks = 30)
+hist(Final_Dataset_control$exam_result, breaks = 40)
+
+
 paste0("nember of patients who took metformin: ", nrow(Final_Dataset_metforin))
+
+Final_Dataset_metforin <- Final_Dataset %>% 
+filter(metformin_use == 1)
+
+summary(Final_Dataset_metforin)
+hist(Final_Dataset_metforin$age, breaks = 30)
+hist(Final_Dataset_metforin$exam_result, breaks = 50)
+
 ```
 
 
@@ -149,7 +174,7 @@ length(which(patient_no_dataset %in% patient_no_medications))
 
 ```{r}
 
-joined_data <- dplyr::right_join(Final_Dataset, medications, by =c("patient_no", "clinic_date"))
+joined_data <- dplyr::full_join(Final_Dataset, medications, by =c("patient_no", "clinic_date"))
 dim(joined_data)
 
 length(unique(joined_data$patient_no))
@@ -159,23 +184,55 @@ joined_data <- joined_data%>%
   janitor::clean_names() 
 
 write_csv(joined_data, here("data", "joined.csv"))
+skim(joined_data)
 
+paste0("categories are ", unique(joined_data$metformin_use))
 ```
 
 ## Analysis
 
 ```{r}
-my_comparisons <- list( c("0", "1"))
+joined_data <-  joined_data %>% 
+  select(-c(hospital_name_x, enterprise_number, exam_detail_item)) %>% 
+  filter(!is.na(gender_x))
 
-Final_Dataset %>% 
+
+```
+
+
+```{r}
+my_comparisons_met <- list( c("0", "1"))
+
+joined_data %>% 
     mutate(metformin_use = factor(metformin_use)) %>% 
     ggboxplot(x = "metformin_use", y = "exam_result",
                 color = "metformin_use", palette =c("#00AFBB", "#E7B800", "#FC4E07"),
                 add = "jitter", shape = "metformin_use") +
     xlab("Metformin Use") +
     ylab("B12 Level") +
-    stat_compare_means(comparisons =  my_comparisons, label = "p.signif", method = "t.test")  # Add pairwise comparisons p-value
+    stat_compare_means(comparisons =  my_comparisons_met, label = "p.signif", method = "t.test")  # Add pairwise comparisons p-value
+
+
+my_comparisons_gender <- list( c("Male", "Female"))
+
+joined_data %>% 
+    mutate(gender = factor(gender_x)) %>% 
+    ggboxplot(x = "gender", y = "exam_result",
+                color = "gender" , palette =c("#00AFBB", "#E7B800"),
+                add = "jitter", shape = "gender") +
+    xlab("Gender") +
+    ylab("B12 Level") +
+    stat_compare_means(comparisons =  my_comparisons_gender, label = "p.signif", method = "t.test")  # Add pairwise comparisons p-value
 
   
+```
+
+
+
+```{r}
+
+model <- lm(exam_result ~ age+ gender_x+bmi,joined_data)
+
+summary(model)
 ```
 
