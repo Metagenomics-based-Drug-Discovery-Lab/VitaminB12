@@ -23,7 +23,8 @@ library(lubridate)
 library(anytime)
 library(DataExplorer)
 library(skimr)
-library(ggpubr)
+library(reshape2)
+
 ```
 
 ## Read the data from excel
@@ -179,59 +180,34 @@ length(patient_no_b12_medications)
 ## Join metformin with full dataset
 joined_data_met <- dplyr::full_join(Final_Dataset, medications, by =c("patient_no", "clinic_date"))
 dim(joined_data_met)
-
 length(unique(joined_data_met$patient_no))
-
 joined_data_met <- joined_data_met %>% 
-  select(-ends_with(".y")) %>% 
   janitor::clean_names()  %>% 
   rename(d_o_b = d_o_b_x) 
-
 write_csv(joined_data_met, here("data", "joined.csv"))
 skim(joined_data_met)
-
 ## Join B12  with full dataset
-
 joined_data_b12 <- dplyr::full_join(joined_data_met, B12, by =c("patient_no", "d_o_b" ,"clinic_date"))
-
-
 ## Join metformin and B12 dataset
-
-
 joined_data_b12 <-  joined_data_b12 %>% 
   rename(exam_result_B12 = exam_result) %>% 
-  select(-c(exam_detail_item, exam_name, gender_x)) %>% 
+  # select(-c(exam_detail_item, exam_name, gender_x)) %>% 
   distinct(patient_no, d_o_b, clinic_date, exam_result_B12, .keep_all = TRUE) %>% 
-  select(-c(hospital_name_x, enterprise_number)) %>% 
+  # select(-c(hospital_name_x, enterprise_number)) %>% 
   rename(B12_name = medicine_name_general.y) %>% 
   rename(prescription_date_B12 = prescription_date.y, prescription_date_metformin = prescription_date.x) %>% 
-  select(-c(hospital_name)) %>% 
   filter(!is.na(gender)) %>% 
-  filter(!is.na(exam_result_B12)) 
-
-
+  filter(!is.na(exam_result_B12)) %>% 
+  mutate(gender = as.factor(gender))
 dim(joined_data_b12)
-
 paste0("categories are ", unique(joined_data_met$metformin_use))
+
 ```
 
 ## Analysis
 
 ```{r}
-joined_data_b12 <-  joined_data_b12 %>%
-  mutate(category = ifelse(
-    metformin_use == 0 & str_detect(B12_name, "ablet"),
-    0,
-        ifelse(
-      metformin_use == 0 & str_detect(B12_name, "njection"),
-      1,
-    ifelse(
-      metformin_use == 1 & str_detect(B12_name, "ablet"),
-      2,
-      ifelse(metformin_use == 1 & str_detect(B12_name, "njection"),
-             3, 4)
-    )
-  )))
+
 
 
 ```
@@ -239,24 +215,56 @@ joined_data_b12 <-  joined_data_b12 %>%
 
 ```{r}
 
-data <- write.csv(joined_data_b12, here("data", "joined.csv"))
+data <- write.csv(joined_data_b12, here("results", "joined_students.csv"))
+
 
 ```
 
 
 ```{r}
-library(reshape2)
 reshaped <- joined_data_b12 %>%
   pivot_wider(names_from = category, 
               values_from = exam_result_B12, 
-              values_fill = 0) %>% 
-  select(patient_no,"0","1","2","3")
+              values_fill = NA) 
 
-data <- write.csv(joined_data_b12, here("data", "reshaped.csv"))
+data <- write.csv(reshaped, here("results", "reshaped_students.csv"))
 
 
 ```
 
+
+```{r}
+joined_data_b12 %>% 
+  ggplot(aes( x= age, y= exam_result_B12)) +
+  geom_point(colour = "#0c4c8a") +
+  theme_bw() + 
+  xlab("Age") +
+  ylab("B12 Exam Results")
+
+```
+
+```{r}
+
+joined_data_b12 %>% 
+  ggplot(aes( x= bmi, y= exam_result_B12)) +
+  geom_point(colour = "#0c4c8a") +
+  theme_bw() + 
+  xlab("BMI") +
+  ylab("B12 Exam Results")
+```
+
+```{r}
+
+cor(joined_data_b12$age, joined_data_b12$exam_result_B12,
+  method = "pearson"
+)
+
+cor(joined_data_b12$bmi, joined_data_b12$exam_result_B12,
+  method = "pearson"
+)
+
+
+```
 
 ```{r}
 my_comparisons_met <- list( c("0", "1"), c("0", "2"),c("0", "3"), c("1", "2"), c("1", "3"), c("2", "3"))
@@ -286,12 +294,41 @@ joined_data_b12 %>%
   
 ```
 
+```{r}
+joined_data_b12 %>% 
+    filter(gender == "Male") %>% 
+    mutate(category = factor(category)) %>% 
+    ggboxplot(x = "category", y = "exam_result_B12",
+                color = "category", palette =c("#00AFBB", "#E7B800", "#FC4E07", "#FC4E09"),
+                add = "jitter", shape = "category") +
+    xlab("Metformin Use in Male") +
+    ylab("B12 Level") +
+    scale_x_discrete(labels=c ("- Met/B12 tablet","- Met/B12 Injection", "+ Met/B12 tablet", "+ Met/B12 Injection")) +
+    stat_compare_means(comparisons =  my_comparisons_met, label = "p.signif", method = "t.test")  # Add pairwise comparisons p-value
+
+```
+
+```{r}
+joined_data_b12 %>% 
+    filter(gender == "Female") %>% 
+    mutate(category = factor(category)) %>% 
+    ggboxplot(x = "category", y = "exam_result_B12",
+                color = "category", palette =c("#00AFBB", "#E7B800", "#FC4E07", "#FC4E09"),
+                add = "jitter", shape = "category") +
+    xlab("Metformin Use in Female") +
+    ylab("B12 Level") +
+    scale_x_discrete(labels=c ("- Met/B12 tablet","- Met/B12 Injection", "+ Met/B12 tablet", "+ Met/B12 Injection")) +
+    stat_compare_means(comparisons =  my_comparisons_met, label = "p.signif", method = "t.test")  # Add pairwise comparisons p-value
+
+```
 
 
 ```{r}
 
-model <- lm(exam_result_B12 ~ age+ gender+bmi,joined_data_b12)
+model_1 <- lm(exam_result_B12 ~ age+gender+bmi,joined_data_b12)
+summary(model_1)
 
-summary(model)
 ```
+
+
 

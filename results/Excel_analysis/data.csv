@@ -1,0 +1,14 @@
+﻿t-Test: Two-Sample Assuming Equal Variances,,
+,,
+,Variable 1,Variable 2
+Mean,391.9599145,423.4773663
+Variance,126602.7305,127438.7891
+Observations,1871,1458
+Pooled Variance,126968.8674,
+Hypothesized Mean Difference,0,
+df,3327,
+t Stat,-2.531985605,
+P(T<=t) one-tail,0.005693754,
+t Critical one-tail,1.645311756,
+P(T<=t) two-tail,0.011387509,
+t Critical two-tail,1.960677276,

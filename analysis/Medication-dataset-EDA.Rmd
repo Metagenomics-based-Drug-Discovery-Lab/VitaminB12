@@ -1,0 +1,101 @@
+---
+title: "Medication datset"
+author: "Batool"
+date: "18/04/2022"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Install Packages
+
+```{r message=FALSE, warning=FALSE}
+library(readxl)
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+library(anytime)
+library(DataExplorer)
+library(skimr)
+library(ggpubr)
+library(postHoc)
+library(tibbletime)
+
+```
+
+
+
+## Read the data from excel
+
+
+```{r  echo=FALSE}
+
+#read the Final_Dataset
+Final_Dataset <- read_csv(here("data","Final_Dataset.csv")) %>% 
+  janitor::clean_names() %>% 
+  filter(!is.na(gender)) %>% 
+  filter(!is.na(exam_result)) %>% 
+  mutate(age = gsub("year","", age)) %>% 
+  distinct(.keep_all = TRUE) 
+
+
+Final_Dataset <- Final_Dataset[!duplicated(Final_Dataset[c(2,5)]),]
+
+# Make the age and exam results numeric in the complete dataset 
+Final_Dataset$age <-as.numeric(Final_Dataset$age)
+Final_Dataset$exam_result <-as.numeric(Final_Dataset$exam_result)
+Final_Dataset$patient_no <- as.character(Final_Dataset$patient_no)
+
+
+
+```
+## Remove multiple entry for each patients
+
+```{r}
+Final_Dataset_single_entry_patients <-  Final_Dataset %>%
+  group_by(patient_no) %>% 
+  filter(clinic_date == min(clinic_date)) %>% 
+  ungroup()
+```
+
+## Plot 
+
+```{r}
+
+
+my_comparisons_met <-
+  list(
+       c("0", "1"))
+
+Final_Dataset_single_entry_patients %>%
+  ggboxplot(
+    x = "metformin_use",
+    y = "exam_result") +
+  xlab("Metformin Use") +
+  ylab("B12 Level") +
+  scale_x_discrete( labels = c (
+      "- Metformin",
+      "+ Metformin" 
+    )
+  ) +
+  stat_compare_means(comparisons =  my_comparisons_met,
+                     label = "p.signif",
+                     method = "t.test")  # Add pairwise comparisons p-value
+
+    
+    
+    
+```
+
+```{r}
+
+Final_Dataset_single_entry_patients %>% 
+  group_by(metformin_use) %>% 
+  get_summary_stats(exam_result)
+
+```
+

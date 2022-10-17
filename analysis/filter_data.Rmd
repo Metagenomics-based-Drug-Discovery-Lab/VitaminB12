@@ -1,0 +1,419 @@
+---
+title: "Filter Data by Year"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Install Packages
+
+```{r message=FALSE, warning=FALSE}
+library(readxl)
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+library(anytime)
+library(DataExplorer)
+library(skimr)
+library(ggpubr)
+library(postHoc)
+library(tibbletime)
+
+```
+
+## Read the data from excel
+
+
+```{r  echo=FALSE}
+#read the complete dataset
+Final_Dataset <- read_csv(here("data","Final_Dataset.csv")) %>% 
+  janitor::clean_names() %>% 
+  filter(!is.na(gender)) %>% 
+  filter(!is.na(exam_result)) %>% 
+  mutate(age = gsub("year","", age)) %>% 
+  distinct(.keep_all = TRUE) 
+
+
+Final_Dataset <- Final_Dataset[!duplicated(Final_Dataset[c(2,5)]),]
+
+# Make the age and exam results numeric in the complete dataset 
+Final_Dataset$age <-as.numeric(Final_Dataset$age)
+Final_Dataset$exam_result <-as.numeric(Final_Dataset$exam_result)
+Final_Dataset$patient_no <- as.character(Final_Dataset$patient_no)
+
+#read the medications dataset
+medications <- read_csv(here("data","medications.csv")) %>% 
+  janitor::clean_names() %>% 
+  filter(!is.na(gender)) %>% 
+  distinct(.keep_all = TRUE)
+
+
+medications$patient_no <- as.character(medications$patient_no)
+medications <- medications[!duplicated(medications[c(2,5)]),]
+
+
+#read B12 data and make columns chracters
+B12 <- read_csv(here("data", "Final_medications_list.csv")) %>% 
+  janitor::clean_names() %>% 
+  filter(!is.na(gender)) %>% 
+  distinct(.keep_all = TRUE)
+
+
+B12$patient_no <- as.character(B12$patient_no)
+B12 <- B12[!duplicated(B12[c(2,5)]),]
+
+
+```
+
+```{r}
+
+
+## Join metformin with full dataset
+joined_data_met <- dplyr::full_join(Final_Dataset, medications, by =c("patient_no", "clinic_date", "d_o_b", "gender"))
+
+joined_data_met <- joined_data_met %>% 
+  janitor::clean_names() %>% 
+  group_by(patient_no) %>% 
+  fill(medicine_name_general, .direction="downup") %>% 
+  dplyr::ungroup() %>% 
+  rename( medicine_name_metformin = medicine_name_general, clinic_date_metformin = clinic_date) %>% 
+  filter(!is.na(gender)) %>% 
+  distinct(.keep_all = TRUE)
+ 
+
+## Join B12 with full dataset
+joined_data_b12 <- dplyr::full_join(Final_Dataset, B12, by =c("patient_no", "d_o_b", "gender"))
+
+joined_data_b12 <- joined_data_b12 %>% 
+  janitor::clean_names() %>% 
+  filter(!is.na(gender)) %>% 
+  distinct(.keep_all = TRUE)
+
+## Join B12 with Metformin
+
+joined_all <- dplyr::full_join(joined_data_b12, joined_data_met, by =c("patient_no", "d_o_b", "gender"))
+
+joined_all <- joined_all %>% 
+  janitor::clean_names() %>% 
+  filter(!is.na(patient_no)) %>% 
+  filter(!is.na(gender)) %>% 
+  filter(!is.na(age_x)) %>% 
+  filter(!is.na(exam_result_x)) %>% 
+  distinct(.keep_all = TRUE) %>% 
+  # select(-c(hospital_name_x_x, hospital_name_y_y, hospital_name_x_y, enterprise_number_x, clinic_date_y, bmi_y, age_y, metformin_use_y)) %>% 
+  # select(-c(hospital_name_x.x, hospital_name_y.y, hospital_name_x.y, enterprise_number.x, clinic_date.y, bmi_y, age.y, metformin_use.y)) %>% 
+  rename(b12_name = medicine_name_general, metformin_use = metformin_use_x, age = age_x, bmi = bmi_x, B12_exam_execution_date = exam_execution_date_x, B12_exam_detail_item = exam_detail_item_x, B12_exam_result = exam_result_x, exam_name = exam_name_x) %>% 
+    distinct(.keep_all = TRUE)
+
+
+joined_all <- joined_all[!duplicated(joined_all[c(7,9)]),]
+
+
+```
+
+
+```{r}
+
+## Add category for injection/tablet
+joined_all$b12_name[is.na(joined_all$b12_name)] <- "None"
+
+joined_all <-  joined_all %>%
+  mutate(
+    category = ifelse(metformin_use == 0 & b12_name == "None",
+    1,
+    ifelse(
+      metformin_use == 0 & str_detect(b12_name, "ablet"),
+      2,
+      ifelse(
+        metformin_use == 0 & str_detect(b12_name, "njection"),
+        3,
+        ifelse(metformin_use == 1 & b12_name == "None",
+        4,
+        ifelse(
+          metformin_use == 1 & str_detect(b12_name, "ablet"),
+          5,
+          ifelse(metformin_use == 1 &
+                   str_detect(b12_name, "njection"),
+                 6, 7)
+      )
+    )
+  ))))
+```
+
+
+```{r}
+
+joined_all_patient_101103 <- joined_all %>% 
+  filter(patient_no == 101103) 
+
+joined_all_patient_101103 %>% 
+  ggplot(aes(x=clinic_date_x, y= B12_exam_result, label=clinic_date_x )) + 
+  geom_point(size = 1) +
+  geom_text(aes(label = clinic_date_x), hjust=0,vjust=0) +
+  xlab("Clinical Date") +
+  ylab("B12 Level") +
+  theme_minimal()
+
+
+
+#10209
+
+joined_all_patient_10209 <- joined_all %>% 
+  filter(patient_no == 10209) 
+
+joined_all_patient_10209 %>% 
+  ggplot(aes(x=clinic_date_x, y= B12_exam_result, label=clinic_date_x)) + 
+  geom_point() +
+  geom_text(aes(label = clinic_date_x), hjust=0,vjust=0) +
+  xlab("Clinical Date") +
+  ylab("B12 Level") +
+  theme_minimal()
+
+
+```
+
+
+```{r}
+
+joined_all <-  joined_all %>%
+  group_by(patient_no) %>% 
+  filter(clinic_date_x == min(clinic_date_x)) %>% 
+  ungroup()
+
+reshaped <- joined_all %>%
+  pivot_wider(names_from = category, 
+              values_from = B12_exam_result, 
+              values_fill = NA) 
+
+```
+
+
+
+```{r}
+
+joined_filtered <- joined_all %>% 
+  distinct(patient_no, .keep_all = TRUE) 
+  
+# joined_all[which(joined_all$metformin_use == 0 & joined_all$b12_name == "None"),]
+
+```
+
+```{r}
+
+
+
+# save data to results folder
+data_1 <- write.csv(joined_all, here("results", "joined_all_earlier_clinical_dates.csv"))
+data_2 <- write.csv(joined_filtered, here("results", "joined_filtered_earlier_clinical_dates.csv"))
+data_3 <- write.csv(reshaped, here("results", "joined_filtered_earlier_clinical_dates_reshaped_categories.csv"))
+
+
+
+```
+
+
+```{r}
+
+
+my_comparisons_met <-
+  list(
+       c("1", "4"),
+       c("4", "5"),
+       c("2", "5"))
+
+joined_all %>%
+  filter(category != 3) %>% 
+  filter(category != 6) %>% 
+  mutate(category = factor(category)) %>%
+  ggboxplot(
+    x = "category",
+    y = "B12_exam_result",
+    color = "category",
+    palette = c(
+      "#00AFBB",
+      "#E7B800",
+      "#FC4E09",
+      "#FC4E03"
+    ),
+    add = "jitter",
+    shape = "category"
+  ) +
+  xlab("Metformin Use") +
+  ylab("B12 Level") +
+  scale_x_discrete(
+    labels = c (
+      "- Met/no supplement",
+      "- Met/B12 tablet",
+      "+ Met/no supplement" ,
+      "+ Met/B12 tablet"
+    )
+  ) +
+  stat_compare_means(comparisons =  my_comparisons_met,
+                     label = "p.signif",
+                     method = "t.test")  # Add pairwise comparisons p-value
+
+
+my_comparisons_gender <- list(c("Male", "Female"))
+
+joined_all %>%
+  mutate(gender = factor(gender)) %>%
+  ggboxplot(
+    x = "gender",
+    y = "B12_exam_result",
+    color = "gender" ,
+    palette = c("#00AFBB", "#E7B800"),
+    add = "jitter",
+    shape = "gender"
+  ) +
+  xlab("Gender") +
+  ylab("B12 Level") +
+  stat_compare_means(comparisons =  my_comparisons_gender,
+                     label = "p.signif",
+                     method = "t.test")  # Add pairwise comparisons p-value
+
+
+```
+
+```{r}
+
+joined_summary_all <-  joined_all %>% 
+  group_by(category) %>% 
+  get_summary_stats(B12_exam_result)
+
+joined_aummary_2019 <-  joined_all %>%
+  subset(clinic_date_x > "2019-01-01" & clinic_date_x < "2020-01-01") %>% 
+  group_by(category) %>% 
+  get_summary_stats(B12_exam_result)
+
+joined_aummary_2020 <-  joined_all %>%
+  subset(clinic_date_x > "2020-01-01" & clinic_date_x < "2021-01-01") %>% 
+  group_by(category) %>% 
+  get_summary_stats(B12_exam_result)
+
+joined_aummary_2021 <-  joined_all %>%
+  subset(clinic_date_x > "2021-01-01" & clinic_date_x < "2022-01-01") %>% 
+  group_by(category) %>% 
+  get_summary_stats(B12_exam_result)
+
+
+joined_with_dose <-  joined_all %>% 
+  filter(!is.na(package_unit_per_dose))
+
+unique(joined_with_dose$package_unit_per_dose)
+
+```
+
+```{r}
+
+joined_with_dose <-  joined_all %>% 
+  filter(!is.na(package_unit_per_dose) | metformin_use == 0 )
+
+
+joined_with_dose_summary <- joined_with_dose %>% 
+  group_by(package_unit_per_dose) %>% 
+  get_summary_stats(B12_exam_result)
+
+```
+
+
+```{r}
+# compare between two category (without metformin and without supplemnet / with metformin and without supplemnts)
+
+# outliers <- 
+#   joined_all %>%
+#   group_by(category) %>%
+#   filter(B12_exam_result > quantile(B12_exam_result, 0.75) + 1.5 * IQR(B12_exam_result) | 
+#            B12_exam_result < quantile(B12_exam_result, 0.25) - 1.5 * IQR(B12_exam_result))
+
+
+joined_all %>%
+  filter(category == 1 | category == 4) %>%
+  mutate(category = as.factor(category)) %>%
+  ggplot(aes(x = category, y = B12_exam_result, color=category)) +
+  geom_boxplot(position = "dodge2",   outlier.alpha = 0.4,) +
+  stat_summary(fun.y=mean, geom="point", shape=23, size=4) + 
+  # geom_jitter(shape=16, position=position_jitter(0.3), alpha = 0.5) +
+  xlab("") +
+  ylab("B12 Level") +
+  scale_x_discrete(
+    labels = c (
+      "Control",
+      "Metformin" 
+    ))+
+  scale_fill_brewer(palette="RdBu") +
+      theme_minimal()
+    
+
+```
+
+```{r}
+t.test(joined_all$category == 1, joined_all$category == 4, alternative = "greater")
+
+t.test(joined_all$category == 2, joined_all$category == 5, alternative = "greater")
+
+t.test(joined_all$category == 3, joined_all$category == 6, alternative = "greater")
+
+```
+
+
+```{r}
+model_1 <- lm(B12_exam_result ~ age+gender+bmi,joined_all)
+summary(model_1)
+
+```
+
+
+```{r}
+# Compute the analysis of variance
+
+joined_all_variance <-  joined_all %>% 
+  mutate(category = as.factor(category))
+
+res.aov <- aov(B12_exam_result ~ category,joined_all)
+# Summary of the analysis
+summary(res.aov)
+TukeyHSD(res.aov)
+
+
+```
+
+
+
+```{r}
+
+
+joined_all %>% 
+  ggplot(aes( x= age, y= B12_exam_result)) +
+  geom_point(colour = "#0c4c8a") +
+  scale_y_continuous(trans='log10')
+  theme_minimal() + 
+  xlab("Age") +
+  ylab("B12 Exam Results")
+
+
+joined_all %>% 
+  ggplot(aes( x= bmi, y= B12_exam_result)) +
+  geom_point(colour = "#0c4c8a") +
+  scale_y_continuous(trans='log10')
+  theme_minimal() + 
+  xlab("BMI") +
+  ylab("B12 Exam Results")
+
+```
+
+```{r}
+
+cor(joined_all$age, joined_all$B12_exam_result,
+  method = "pearson"
+)
+
+cor(joined_all$bmi, joined_all$B12_exam_result,
+  method = "pearson"
+)
+
+
+```
